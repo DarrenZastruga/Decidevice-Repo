@@ -1,27 +1,27 @@
 declared-services:
-  wos-conversation-service:
+  Conversation-nt:
     label: conversation
     plan: free
-  wos-cloudantNoSQLDB-service:
+  cloudant-for-slackapp:
     label: cloudantNoSQLDB
     plan: Lite
-  wos-discovery-service:
+  discovery-for-demo:
     label: discovery
     plan: lite
 applications:
 - services:
-   - wos-conversation-service
-   - wos-cloudantNoSQLDB-service
-   - wos-discovery-service
+   - Conversation-nt
+   - cloudant-for-slackapp
+   - discovery-for-demo
   path: .
   command: python ./run.py
   memory: 128M
   instances: 1
-  name: watson-online-store
+  name: decidevice-chat
   disk_quota: 1024M
   health-check-type: process
   no-route: true
 env:
-  CLOUDANT_DB_NAME: watson-online-store
-  SLACK_BOT_USER: wos
-  SLACK_BOT_TOKEN: placeholder
+  CLOUDANT_DB_NAME: cloudant-for-slackapp
+  SLACK_BOT_USER: decidevice-chatbot
+  SLACK_BOT_TOKEN: xoxb-267158753570-55gXIwn16iLZyPUzkMRSoShG
