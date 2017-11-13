@@ -67,3 +67,71 @@ class NaturalLanguageClassifierV1(WatsonDeveloperCloudService):
         return self.request(method='DELETE',
                             url='/v1/classifiers/{0}'.format(classifier_id),
                             accept_json=True)
+    
+    def get_nlc_response(self, input_text):
+        """Call NLC with input_text and return formatted response.
+        Formatted response_tuple is saved for Conversation to allow to be referenced.
+        Response is then further formatted to be passed to UI.
+        :param str input_text: query to be used with Watson NLC Service
+        :returns: NLC response in format for Watson Conversation
+        :rtype: dict
+        """
+
+        nlc_response = self.discovery_client.query(
+            classifier_id=self.classifier_id,
+            query_options={'query': input_text, 'count': DISCOVERY_QUERY_COUNT}
+        )
+
+        # Watson nlc assigns a confidence level to each result.
+        # Based on data mix, we can assign a minimum tolerance value in an
+        # attempt to filter out the "weakest" results.
+        if self.nlc_score_filter and 'results' in nlc_response:
+            fr = [x for x in nlc_response['results'] if 'score' in x and
+                  x['score'] > self.nlc_score_filter]
+
+            nlc_response['matching_results'] = len(fr)
+            nlc_response['results'] = fr
+
+        response = self.format_nlc_response(nlc_response,
+                                                  self.dnlc_data_source)
+        self.response_tuple = response
+
+        fmt = "{cart_number}) {name}\n{image}"
+        formatted_response = "\n".join(fmt.format(**item) for item in response)
+        return {'nlc_result': formatted_response}
+     def handle_nlc_query(self):
+        """Take query string from Watson Context and send to the Natural Language Classifier (NLC) service.
+       NLC response will be merged into context in order to allow it to
+        be returned to Watson. In the case where there is no NLC client,
+        a fake response will be returned, for testing purposes.
+        :returns: False indicating no need for UI input, just return to Watson
+        :rtype: Bool
+        """
+        query_string = self.context['nlc_string']
+        if self.nlc_client:
+            try:
+                response = self.get_nlc_response(query_string)
+            except Exception as e:
+                response = {'nlc_result': repr(e)}
+        else:
+            response = self.get_fake_nlc_response()
+
+        self.context = self.context_merge(self.context, response)
+        LOG.debug("watson_nlc:\n{}\ncontext:\n{}".format(response,
+                                                               self.context))
+
+        # no need for user input, return to Watson Dialogue
+        return False
+
+    def get_watson_response(self, message):
+        """Sends text and context to Watson and gets reply.
+        Message input is text, self.context is also added and sent to Watson.
+        :param str message: text to send to Watson
+        :returns: json dict from Watson
+        :rtype: dict
+        """
+        response = self.conversation_client.message(
+            workspace_id=self.workspace_id,
+            message_input={'text': message},
+            context=self.context)
+        return response
